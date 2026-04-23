@@ -114,7 +114,7 @@ git commit -am "sync: update patches from ChuranNeko@<commit>"
 
 ## License
 
-This project is licensed under **GPL-2.0-only**, matching the upstream OpenWrt / ImmortalWrt ecosystem. See the [`COPYING`](./COPYING) file for the full license text.
+This project is licensed under **GPL-2.0-only**, matching the upstream OpenWrt / ImmortalWrt ecosystem. See the [`LICENSE`](./LICENSE) file for the full license text.
 
 - `patches/` contents are derived from [ChuranNeko/openwrt-snapshot-gl-mt3600be](https://github.com/ChuranNeko/openwrt-snapshot-gl-mt3600be) and retain their original GPL-2.0 license.
 - `build.sh`, `scripts/`, and all other original files in this repo are released under GPL-2.0-only.
