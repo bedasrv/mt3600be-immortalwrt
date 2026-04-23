@@ -1,3 +1,0 @@
-	glinet,gl-mt3600be)
-		ucidef_set_interfaces_lan_wan "eth1" eth0
-		;;

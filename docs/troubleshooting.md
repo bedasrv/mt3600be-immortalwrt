@@ -1,129 +1,171 @@
-# Troubleshooting Guide
+# Troubleshooting
 
-按"可能遇到的阶段"排序。
+按"哪一步报错"排序。
 
 ---
 
-## Phase 1: `./build.sh` 装依赖失败
+## Step 1: 装依赖失败
 
-**症状**：`apt-get install` 某个包失败。
+**症状**：`apt-get install` 某个包失败、或报 `E: Unable to locate package`。
 
 **修复**：
 ```bash
 sudo apt-get update
-sudo apt-get install -f  # 修复依赖
-# 然后继续
+sudo apt-get install -f
 ./build.sh --deps-only
 ```
 
-如果是非 Ubuntu 系统，参考 [dependencies.md](./dependencies.md) 手工装。
+非 Ubuntu 系统请参考 [dependencies.md](./dependencies.md) 手工装。
 
 ---
 
-## Phase 2: clone 宿主树慢/失败
+## Step 2: clone 宿主树失败
 
-**症状**：`git clone SmartRouterZone/mt798x-rebase` 超时。
+**症状 A**：`Repository not found`
 
-**修复**：国内云服务器建议给 git 挂个 GitHub 加速器 或者换成 ImmortalWrt 官方 fork：
+说明宿主树 URL 在你 clone 的那一刻无法访问。试试换源：
 
 ```bash
-HOST_TREE_URL=https://github.com/immortalwrt-mt798x/immortalwrt.git ./build.sh
+# 方案1: ImmortalWrt 官方 mt798x fork
+HOST_TREE_URL=https://github.com/immortalwrt-mt798x/immortalwrt.git \
+HOST_TREE_BRANCH=master \
+./build.sh
+
+# 方案2: ImmortalWrt 主线（官方，但 MT3600BE 支持可能滞后）
+HOST_TREE_URL=https://github.com/immortalwrt/immortalwrt.git \
+HOST_TREE_BRANCH=master \
+./build.sh
 ```
 
----
+**症状 B**：克隆很慢或超时
 
-## Phase 3: 合 patch 警告 "no 'esac' in $target"
-
-**症状**：`build.sh` 的 `apply_snippet_before_esac` 找不到合适插入点。
-
-**原因**：宿主树的 `board.d/01_leds` 文件结构跟 ChuranNeko 不一样（比如用了多层嵌套 case）。
-
-**修复**：手工合并，打开 `openwrt/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds`，把 `patches/snippets/01_leds.case` 内容粘贴到合适的 case 分支里。
+国内云服务器 + GitHub 的老问题。几个选择：
+- 用 GitHub 加速器（比如 `ghproxy.com`）改 URL
+- 用 Gitee 镜像（搜 "immortalwrt-mt798x gitee 镜像"）
+- 增加 clone 深度让它一次拉完：`HOST_TREE_DEPTH=100 ./build.sh`
 
 ---
 
-## Phase 4: `make defconfig` 警告一堆 package 不存在
+## Step 3: verify_device_support 失败
+
+**症状**：
+```
+MT3600BE DTS not found: openwrt/target/linux/mediatek/dts/mt7987a-glinet-gl-mt3600be.dts
+```
+
+**说明**：你换了宿主树或 branch，新的树没有 MT3600BE 适配。
+
+**修复**：
+- 换回默认的 chasey-dev + 25.12 分支
+- 或者去 `openwrt/target/linux/mediatek/dts/` 看有什么设备，改 `build.sh` 里的 `DEVICE_PROFILE` 测别的板子
+
+---
+
+## Step 4: feeds/defconfig 阶段出警告
 
 **典型信息**：
 ```
-WARNING: Makefile 'package/feeds/packages/adguardhome/Makefile' has a dependency on 'luci-app-openclash', which does not exist
+WARNING: Makefile 'package/feeds/packages/xxx/Makefile' has a build depends on 'yyy', which does not exist
 ```
 
-**原因**：`filogic.mk` 里的 `DEVICE_PACKAGES` 有在 ImmortalWrt 里找不到的包。
+**一般无需处理**——这是 feeds 里某些包互相依赖的非致命警告。只要 `.config` 能正常生成、`CONFIG_TARGET_DEVICE_glinet_gl-mt3600be=y` 在里面，就可以继续。
 
-**修复**：打开 `openwrt/target/linux/mediatek/image/filogic.mk`，找到 `Device/glinet_gl-mt3600be` block，删掉找不到的包：
-- `adguardhome` → ImmortalWrt 里是 `luci-app-adguardhome`
-- `luci-app-openclash` → 需要手动加第三方 feed
-- `mt7987-2p5g-phy-firmware` / `kmod-mt7990-firmware` → 可能在 ImmortalWrt 里不存在，需要从 ChuranNeko 源码包移植过来
-
----
-
-## Phase 5: kernel patch apply 失败
-
-**典型信息**：
-```
-Applying mt7987.dtsi ... patch doesn't apply
-```
-
-**原因**：宿主树的 kernel 版本或 DTS 目录结构跟 ChuranNeko 不一样。
-
-**修复路径**：
-1. 先不要 `--with-soc`——如果宿主树已有 MT7987 基础支持，让 `build.sh` 自动跳过。
-2. 如果必须注入 SoC support，进 `openwrt/target/linux/mediatek/dts/` 对比差异，手动 rebase。
-
----
-
-## Phase 6: Wi-Fi 节点绑定报错 (最大坑)
-
-**典型信息**（在 `dmesg` 或 kernel build log 里）：
-```
-mt7987a-glinet-gl-mt3600be.dts:...: wifi@... compatible "mediatek,mt7990" unsupported
-```
-
-**原因**：**这就是标题里那个"第一次大概率编不过"的根本原因**。ChuranNeko 用的是开源 mt76 驱动，DTS 里 wifi 节点用的是 `compatible = "mediatek,mt7990"` 等 mt76 的 binding。ImmortalWrt mt798x-rebase 用闭源 `mtwifi-cfg`，它期待的 compatible 和 reg 区域完全不同。
-
-**修复思路**（需要对照 mt798x-rebase 里现有 MT7987 设备的 DTS 来改）：
-1. 去 `openwrt/target/linux/mediatek/dts/` 找形如 `mt7987a-bananapi-bpi-r4-lite.dts` 等 reference board，看它的 wifi 节点怎么写
-2. 把 `mt7987a-glinet-gl-mt3600be.dts` 里的 wifi 节点替换成 mtwifi-cfg 风格
-3. 注意 EEPROM 偏移、MAC 分配、频段 capabilities 都要保留 MT3600BE 特有的值
-
-这步没有捷径，是真正需要硬核移植的地方。
-
----
-
-## Phase 7: 编出来了但刷不进 / 刷进去不启动
-
-**症状**：`sysupgrade` 报 "Invalid image" 或设备开机后无法访问 192.168.1.1。
-
-**可能原因**：
-- U-Boot 分区表和 DTS 里 `partitions` 节点不一致（分区地址、大小）
-- UBI 页大小 / 块大小 不匹配（`UBINIZE_OPTS`, `BLOCKSIZE`, `PAGESIZE`）
-- squashfs vs ext4 rootfs 格式选错
-
-**回滚**：按住 reset 开机进 GL.iNet 原厂 U-Boot (http://192.168.1.1)，上传原厂固件恢复。
-
----
-
-## 通用排错技巧
-
-**查看详细编译错误**：
+**检查 .config 是不是正确选了设备**：
 ```bash
-cd openwrt
-make -j1 V=s 2>&1 | tee ../logs/verbose.log
+grep DEVICE_glinet_gl-mt3600be openwrt/.config
+# 应该看到：CONFIG_TARGET_mediatek_filogic_DEVICE_glinet_gl-mt3600be=y
 ```
 
-**定位是哪个 package 挂了**：
+没看到的话 `./build.sh --menuconfig` 手动勾：`Target Profile → GL.iNet GL-MT3600BE`。
+
+---
+
+## Step 5: 编译失败
+
+`build.sh` 会自动在失败时跑一次 `make -j1 V=s` 并输出最后 50 行到控制台。完整日志在 `logs/verbose-*.log`。
+
+**最常见的错误类型**：
+
+### 5.1 网络原因 download 失败
+
+`download-*.log` 里有 `wget: unable to resolve host` 或 `HTTP 403`：
 ```bash
-grep -E "^(make|ERROR|FAILED|\\*\\*\\*)" logs/verbose.log | head -20
+# 重试通常能解决
+cd openwrt && make download -j4
+cd .. && ./build.sh --resume
 ```
 
-**只编单个 package**：
+### 5.2 某个包编译失败
+
+定位是哪个包：
+```bash
+grep -E "ERROR: |^make.*Error" logs/build-*.log | head -5
+```
+
+比如报 `package/feeds/packages/foo/Makefile: error`，就去 menuconfig 关掉它：
+```bash
+./build.sh --menuconfig
+# 进 menuconfig 用 `/` 搜 foo，按空格反选
+./build.sh --resume
+```
+
+### 5.3 内存不够（OOM）
+
+大内存包（gcc/kernel）链接时可能吃 >4GB。16G 以下机器建议：
+```bash
+./build.sh --jobs 4   # 减少并行数
+# 或加 swap
+sudo dd if=/dev/zero of=/swapfile bs=1G count=4
+sudo mkswap /swapfile && sudo swapon /swapfile
+```
+
+### 5.4 磁盘满
+
+```bash
+df -h .
+# 清 ccache
+ccache -C
+# 清构建中间产物（但保留 dl/ 避免重下）
+cd openwrt && make clean
+```
+
+---
+
+## Step 6: 编出来了但刷不进
+
+**症状**：`sysupgrade -T` 报 "Invalid image type" 或 "Magic mismatch"
+
+**说明**：大概率是你从原厂固件直接刷 ImmortalWrt 时校验不过。
+
+**修复**：
+1. 先进 GL.iNet 原厂 U-Boot（断电，按住 reset 通电，`http://192.168.1.1`）
+2. 通过 U-Boot Web UI 上传固件，不走 sysupgrade
+
+**GL.iNet 官方 U-Boot 教程**：<https://docs.gl-inet.com/router/en/4/tutorials/uboot/>
+
+---
+
+## 通用技巧
+
+**看完整编译日志的最后 200 行**：
+```bash
+tail -200 logs/build-*.log | less
+```
+
+**只重编某个 package**：
 ```bash
 cd openwrt
 make package/mt7990-firmware/{clean,compile} V=s
 ```
 
-**对比两棵树的文件差异**：
+**两棵树对比**（如果想借鉴 ChuranNeko 的适配）：
 ```bash
-diff -ruN ~/work/churanneko/target/linux/mediatek/ openwrt/target/linux/mediatek/
+git clone --depth=1 https://github.com/ChuranNeko/openwrt-snapshot-gl-mt3600be.git /tmp/ref
+diff -ruN /tmp/ref/target/linux/mediatek/ openwrt/target/linux/mediatek/ | less
+```
+
+**追 MT3600BE 在宿主树里的历史**：
+```bash
+cd openwrt
+git log --all --oneline -- target/linux/mediatek/dts/mt7987a-glinet-gl-mt3600be.dts
 ```
