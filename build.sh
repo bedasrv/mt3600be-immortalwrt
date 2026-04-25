@@ -452,10 +452,10 @@ do_compile() {
   # Make sure we clean up the monitor if user Ctrl+C's
   trap "stop_monitor $dl_mon_pid; exit 130" INT TERM
 
-  # The actual download
+  # The actual download (tee to both log file and stdout)
   local dl_rc=0
-  if ! make download -j"$JOBS" > "$dl_log" 2>&1; then
-    dl_rc=$?
+  if ! make download -j"$JOBS" 2>&1 | tee "$dl_log"; then
+    dl_rc=${PIPESTATUS[0]}
   fi
   touch "$dl_done_stamp"
   stop_monitor "$dl_mon_pid"
@@ -486,8 +486,8 @@ do_compile() {
   trap "stop_monitor $build_mon_pid; exit 130" INT TERM
 
   local build_rc=0
-  if ! make -j"$JOBS" > "$build_log" 2>&1; then
-    build_rc=$?
+  if ! make -j"$JOBS" 2>&1 | tee "$build_log"; then
+    build_rc=${PIPESTATUS[0]}
   fi
   touch "$build_done_stamp"
   stop_monitor "$build_mon_pid"
