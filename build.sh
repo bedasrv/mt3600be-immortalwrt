@@ -431,71 +431,23 @@ do_compile() {
   cd "$WORK_DIR"
 
   local ts; ts="$(date +%Y%m%d-%H%M%S)"
-  local dl_log="$LOG_DIR/download-$ts.log"
   local build_log="$LOG_DIR/build-$ts.log"
-  local dl_done_stamp="$LOG_DIR/.dl-done-$ts"
-  local build_done_stamp="$LOG_DIR/.build-done-$ts"
 
-  # ----- 5.1: download with live monitor -----
-  log "  5.1: downloading source packages"
-  log "       live log → $dl_log"
-  log "       monitor  → every 5s, watching openwrt/dl/"
-  echo
-
-  # Remove stale stamp if re-running
-  rm -f "$dl_done_stamp"
-
-  # Start background monitor
-  local dl_mon_pid
-  dl_mon_pid=$(start_monitor "download" "$WORK_DIR/dl" "$dl_done_stamp" 5)
-
-  # Make sure we clean up the monitor if user Ctrl+C's
-  trap "stop_monitor $dl_mon_pid; exit 130" INT TERM
-
-  # The actual download (tee to both log file and stdout)
-  # Set download timeout to prevent hang on unreachable mirrors
+  # ----- 5.1: setup download timeouts -----
+  # make will auto-download missing sources during compilation.
+  # Set timeouts to prevent hanging on unreachable mirrors.
+  log "  5.1: setting download timeouts"
   export WGET_OPTS="--timeout=30 --tries=3"
   export CURL_OPTS="--connect-timeout 30 --max-time 120 --retry 3"
-  local dl_rc=0
-  if ! make download -j"$JOBS" 2>&1 | tee "$dl_log"; then
-    dl_rc=${PIPESTATUS[0]}
-  fi
-  touch "$dl_done_stamp"
-  stop_monitor "$dl_mon_pid"
-  trap - INT TERM
+  ok "  download timeouts set (sources fetched during compile)"
+
+  # ----- 5.2: compile -----
+  log "  5.2: compiling (sources auto-downloaded as needed)"
+  log "       log → $build_log"
   echo
-
-  if [[ $dl_rc -ne 0 ]]; then
-    err "download phase failed (rc=$dl_rc) — last 20 lines of $dl_log:"
-    tail -20 "$dl_log" >&2
-    exit 1
-  fi
-
-  local final_files final_size
-  final_files=$(find "$WORK_DIR/dl" -maxdepth 2 -type f 2>/dev/null | wc -l)
-  final_size=$(du -sh "$WORK_DIR/dl" 2>/dev/null | awk '{print $1}')
-  ok "  download done: $final_files files, $final_size total."
-
-  # ----- 5.2: compile with live monitor -----
-  log "  5.2: compiling"
-  log "       live log → $build_log"
-  log "       monitor  → every 10s, watching openwrt/staging_dir/ and build_dir/"
-  echo
-
-  rm -f "$build_done_stamp"
-  local build_mon_pid
-  build_mon_pid=$(start_monitor "compile " "$WORK_DIR/staging_dir" "$build_done_stamp" 10)
-
-  trap "stop_monitor $build_mon_pid; exit 130" INT TERM
 
   local build_rc=0
-  if ! make -j"$JOBS" 2>&1 | tee "$build_log"; then
-    build_rc=${PIPESTATUS[0]}
-  fi
-  touch "$build_done_stamp"
-  stop_monitor "$build_mon_pid"
-  trap - INT TERM
-  echo
+  make -j"$JOBS" V=s > "$build_log" 2>&1 || build_rc=$?
 
   if [[ $build_rc -ne 0 ]]; then
     err "Build FAILED (rc=$build_rc). Re-running single-threaded verbose for diagnostics:"
