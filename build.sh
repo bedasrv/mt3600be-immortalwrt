@@ -453,6 +453,9 @@ do_compile() {
   trap "stop_monitor $dl_mon_pid; exit 130" INT TERM
 
   # The actual download (tee to both log file and stdout)
+  # Set download timeout to prevent hang on unreachable mirrors
+  export WGET_OPTS="--timeout=30 --tries=3"
+  export CURL_OPTS="--connect-timeout 30 --max-time 120 --retry 3"
   local dl_rc=0
   if ! make download -j"$JOBS" 2>&1 | tee "$dl_log"; then
     dl_rc=${PIPESTATUS[0]}
