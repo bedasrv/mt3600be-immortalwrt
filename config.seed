@@ -78,6 +78,10 @@ CONFIG_PACKAGE_usb-modeswitch=y
 # ---------------------------------------------------------------
 # Extras
 # ---------------------------------------------------------------
+# AmneziaWG — WireGuard fork with obfuscation
+CONFIG_PACKAGE_kmod-amneziawg=y
+CONFIG_PACKAGE_amneziawg-tools=y
+CONFIG_PACKAGE_luci-proto-amneziawg=y
 # nftables JSON output — useful for scripts that parse firewall rules
 CONFIG_PACKAGE_nftables-json=y
 # Keep opkg alongside ImmortalWrt's default apk for compatibility

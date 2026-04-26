@@ -28,8 +28,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # ---------- config (env-overridable) ----------
+AWG_FEED="${AWG_FEED:-src-git amneziawg https://github.com/Slava-Shchipunov/awg-openwrt.git;master}"
 HOST_TREE_URL="${HOST_TREE_URL:-https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git}"
-HOST_TREE_BRANCH="${HOST_TREE_BRANCH:-25.12}"
+HOST_TREE_BRANCH="${HOST_TREE_BRANCH:-openwrt-25.12}"
 HOST_TREE_DEPTH="${HOST_TREE_DEPTH:-1}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/openwrt}"
 LOG_DIR="${LOG_DIR:-$SCRIPT_DIR/logs}"
@@ -326,6 +327,14 @@ Current branch: $HOST_TREE_BRANCH. Try passing HOST_TREE_BRANCH=<newer>"
 run_feeds_and_config() {
   log "Step 4/5: feeds update/install + config..."
   cd "$WORK_DIR"
+
+  # Inject AWG feed (env-overridable; set AWG_FEED="" to skip)
+  if [[ -n "$AWG_FEED" ]]; then
+    if ! grep -qFx "$AWG_FEED" feeds.conf.default 2>/dev/null; then
+      echo "$AWG_FEED" >> feeds.conf.default
+      ok "  AWG feed injected"
+    fi
+  fi
 
   ./scripts/feeds update -a 2>&1 | tail -3
   ./scripts/feeds install -a 2>&1 | tail -3
