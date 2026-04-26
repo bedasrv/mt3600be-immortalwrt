@@ -23,9 +23,20 @@ jobs:
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-                      /opt/hostedtoolcache/CodeQL
-          sudo apt-get clean
+                      /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          (sudo apt-get clean 2>/dev/null || sudo pacman -Scc --noconfirm 2>/dev/null || true)
           df -h
+
+      - name: Install build deps (Arch/CachyOS)
+        if: runner.os == 'Linux'
+        run: |
+          if command -v pacman >/dev/null 2>&1; then
+            sudo pacman -Sy --noconfirm --needed base-devel clang flex bison gawk \
+              git python python-pip python-ply python-docutils python-pyelftools \
+              rsync swig unzip wget subversion ccache curl pkgconf libelf zstd \
+              qemu-img quilt 2>/dev/null || true
+            ccache -M 20G
+          fi
 
       - name: Cache ccache
         uses: actions/cache@v4
