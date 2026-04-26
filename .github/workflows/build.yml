@@ -36,8 +36,6 @@ jobs:
 
       - name: Run build pipeline (deps + apply + compile)
         id: build
-        env:
-          JOBS: 4
         run: |
           chmod +x ./build.sh
           ./build.sh
