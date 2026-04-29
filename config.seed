@@ -89,6 +89,20 @@ CONFIG_PACKAGE_nftables-json=y
 # mwan4 multi-WAN health tracking & failover
 CONFIG_PACKAGE_mwan4=y
 
+# ---------------------------------------------------------------
+# ModemManager — advanced mobile broadband modem management
+# (DW5821e / T77W968 / other QMI/MBIM modems)
+# ---------------------------------------------------------------
+CONFIG_PACKAGE_modemmanager=y
+CONFIG_PACKAGE_modemmanager-rpcd=y
+CONFIG_PACKAGE_luci-proto-modemmanager=y
+
+# ---------------------------------------------------------------
+# Tailscale — mesh VPN with built-in NAT traversal
+# ---------------------------------------------------------------
+CONFIG_PACKAGE_tailscale=y
+CONFIG_PACKAGE_luci-app-tailscale-community=y
+
 # Enable 802.11be (WiFi 7) + MLO AP support in hostapd/wpad
 # mt76 driver already has MLO compiled in unconditionally (no CONFIG_MT76_MLO)
 CONFIG_DRIVER_11BE_SUPPORT=y
