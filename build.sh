@@ -29,7 +29,7 @@ cd "$SCRIPT_DIR"
 
 # ---------- config (env-overridable) ----------
 AWG_FEED="${AWG_FEED:-src-git amneziawg https://github.com/Slava-Shchipunov/awg-openwrt.git;master}"
-MWAN4_FEED="${MWAN4_FEED:-src-git mwan4 https://github.com/mossdef-org/mwan4.git;master}"
+MWAN4_FEED="${MWAN4_FEED:-src-git mwan4 https://github.com/mossdef-org/mwan4.git;main}"
 HOST_TREE_URL="${HOST_TREE_URL:-https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git}"
 HOST_TREE_BRANCH="${HOST_TREE_BRANCH:-openwrt-25.12}"
 HOST_TREE_DEPTH="${HOST_TREE_DEPTH:-1}"
