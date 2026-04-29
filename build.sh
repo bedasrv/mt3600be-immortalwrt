@@ -346,6 +346,15 @@ run_feeds_and_config() {
   fi
 
   ./scripts/feeds update -a 2>&1 | tail -3
+
+  # Single-pkg feed workaround: mwan4 Makefile sits at repo root
+  # but `feeds install` only scans subdirectories for packages.
+  if [[ -f feeds/mwan4/Makefile && ! -f feeds/mwan4/mwan4/Makefile ]]; then
+    mkdir -p feeds/mwan4/mwan4
+    ln -sf ../Makefile feeds/mwan4/mwan4/Makefile
+    ok "  mwan4 feed restructured (root → mwan4/Makefile)"
+  fi
+
   ./scripts/feeds install -a 2>&1 | tail -3
   ok "  feeds done."
 
