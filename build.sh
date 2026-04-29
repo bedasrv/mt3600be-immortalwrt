@@ -29,6 +29,7 @@ cd "$SCRIPT_DIR"
 
 # ---------- config (env-overridable) ----------
 AWG_FEED="${AWG_FEED:-src-git amneziawg https://github.com/Slava-Shchipunov/awg-openwrt.git;master}"
+MWAN4_FEED="${MWAN4_FEED:-src-git mwan4 https://github.com/mossdef-org/mwan4.git;master}"
 HOST_TREE_URL="${HOST_TREE_URL:-https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git}"
 HOST_TREE_BRANCH="${HOST_TREE_BRANCH:-openwrt-25.12}"
 HOST_TREE_DEPTH="${HOST_TREE_DEPTH:-1}"
@@ -333,6 +334,14 @@ run_feeds_and_config() {
     if ! grep -qFx "$AWG_FEED" feeds.conf.default 2>/dev/null; then
       echo "$AWG_FEED" >> feeds.conf.default
       ok "  AWG feed injected"
+    fi
+  fi
+
+  # Inject mwan4 feed (env-overridable; set MWAN4_FEED="" to skip)
+  if [[ -n "$MWAN4_FEED" ]]; then
+    if ! grep -qFx "$MWAN4_FEED" feeds.conf.default 2>/dev/null; then
+      echo "$MWAN4_FEED" >> feeds.conf.default
+      ok "  mwan4 feed injected"
     fi
   fi
 
