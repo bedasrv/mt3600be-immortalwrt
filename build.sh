@@ -338,23 +338,21 @@ run_feeds_and_config() {
   fi
 
   # Inject mwan4 feed (env-overridable; set MWAN4_FEED="" to skip)
+  # Must manually clone + restructure: mwan4 puts Makefile at repo root
+  # but feeds update/install expect packages in subdirectories.
   if [[ -n "$MWAN4_FEED" ]]; then
-    if ! grep -qFx "$MWAN4_FEED" feeds.conf.default 2>/dev/null; then
-      echo "$MWAN4_FEED" >> feeds.conf.default
-      ok "  mwan4 feed injected"
+    if [[ ! -d feeds/mwan4 ]]; then
+      local mwan4_url="https://github.com/mossdef-org/mwan4.git"
+      git clone --depth 1 --branch main "$mwan4_url" feeds/mwan4 2>&1 | tail -3
+      mkdir -p feeds/mwan4/mwan4
+      ln -sf ../Makefile feeds/mwan4/mwan4/Makefile
+      # Register as local src-link (not src-git) so feeds update skips clone
+      echo "src-link mwan4 $PWD/feeds/mwan4" >> feeds.conf.default
+      ok "  mwan4 feed cloned + restructured (root → mwan4/Makefile)"
     fi
   fi
 
   ./scripts/feeds update -a 2>&1 | tail -3
-
-  # Single-pkg feed workaround: mwan4 Makefile sits at repo root
-  # but `feeds install` only scans subdirectories for packages.
-  if [[ -f feeds/mwan4/Makefile && ! -f feeds/mwan4/mwan4/Makefile ]]; then
-    mkdir -p feeds/mwan4/mwan4
-    ln -sf ../Makefile feeds/mwan4/mwan4/Makefile
-    ok "  mwan4 feed restructured (root → mwan4/Makefile)"
-  fi
-
   ./scripts/feeds install -a 2>&1 | tail -3
   ok "  feeds done."
 
