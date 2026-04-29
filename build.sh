@@ -343,12 +343,14 @@ run_feeds_and_config() {
   if [[ -n "$MWAN4_FEED" ]]; then
     if [[ ! -d feeds/mwan4 ]]; then
       local mwan4_url="https://github.com/mossdef-org/mwan4.git"
-      git clone --depth 1 --branch main "$mwan4_url" feeds/mwan4 2>&1 | tail -3
-      mkdir -p feeds/mwan4/mwan4
-      ln -sf ../Makefile feeds/mwan4/mwan4/Makefile
+      # Clone directly into subdirectory — OpenWrt feeds expect
+      # packages in subdirectories under the linked path.
+      # src-link mwan4 feeds/mwan4 → finds feeds/mwan4/*/Makefile
+      mkdir -p feeds/mwan4
+      git clone --depth 1 --branch main "$mwan4_url" feeds/mwan4/mwan4 2>&1 | tail -3
       # Register as local src-link (not src-git) so feeds update skips clone
       echo "src-link mwan4 $PWD/feeds/mwan4" >> feeds.conf.default
-      ok "  mwan4 feed cloned + restructured (root → mwan4/Makefile)"
+      ok "  mwan4 feed cloned into feeds/mwan4/mwan4/"
     fi
   fi
 
