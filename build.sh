@@ -28,8 +28,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # ---------- config (env-overridable) ----------
-AWG_FEED="${AWG_FEED:-src-git amneziawg https://github.com/Slava-Shchipunov/awg-openwrt.git;master}"
-MWAN4_FEED="${MWAN4_FEED:-src-git mwan4 https://github.com/mossdef-org/mwan4.git;main}"
+AWG_FEED="${AWG_FEED:-yes}"  # set to "" to skip; default clones into feeds/amneziawg/
+MWAN4_FEED="${MWAN4_FEED:-yes}"  # set to "" to skip; default clones into feeds/mwan4/mwan4/
 HOST_TREE_URL="${HOST_TREE_URL:-https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git}"
 HOST_TREE_BRANCH="${HOST_TREE_BRANCH:-openwrt-25.12}"
 HOST_TREE_DEPTH="${HOST_TREE_DEPTH:-1}"
@@ -329,11 +329,14 @@ run_feeds_and_config() {
   log "Step 4/5: feeds update/install + config..."
   cd "$WORK_DIR"
 
-  # Inject AWG feed (env-overridable; set AWG_FEED="" to skip)
+  # Inject AWG feed — clone directly into feeds/amneziawg/ (no src-git download).
+  # Slava-Shchipunov/awg-openwrt has packages in subdirs (kmod-amneziawg, etc.).
   if [[ -n "$AWG_FEED" ]]; then
-    if ! grep -qFx "$AWG_FEED" feeds.conf.default 2>/dev/null; then
-      echo "$AWG_FEED" >> feeds.conf.default
-      ok "  AWG feed injected"
+    if [[ ! -d feeds/amneziawg ]]; then
+      local awg_url="https://github.com/Slava-Shchipunov/awg-openwrt.git"
+      git clone --depth 1 --branch master "$awg_url" feeds/amneziawg 2>&1 | tail -3
+      echo "src-link amneziawg feeds/amneziawg" >> feeds.conf.default
+      ok "  AWG feed cloned into feeds/amneziawg/"
     fi
   fi
 
@@ -348,14 +351,22 @@ run_feeds_and_config() {
       # src-link mwan4 feeds/mwan4 → finds feeds/mwan4/*/Makefile
       mkdir -p feeds/mwan4
       git clone --depth 1 --branch main "$mwan4_url" feeds/mwan4/mwan4 2>&1 | tail -3
-      # Register as local src-link (not src-git) so feeds update skips clone
-      echo "src-link mwan4 $PWD/feeds/mwan4" >> feeds.conf.default
+      # Use relative path — avoids PWD expansion issues in feeds scripts
+      echo "src-link mwan4 feeds/mwan4" >> feeds.conf.default
       ok "  mwan4 feed cloned into feeds/mwan4/mwan4/"
     fi
   fi
 
   ./scripts/feeds update -a 2>&1 | tail -3
   ./scripts/feeds install -a 2>&1 | tail -3
+
+  # Explicitly install mwan4 — src-link feeds sometimes need a second pass
+  if [[ -n "$MWAN4_FEED" ]] && [[ -d feeds/mwan4/mwan4 ]]; then
+    ./scripts/feeds install mwan4 2>&1 | tail -3 || warn "  mwan4 feed install had issues"
+    if grep -q 'mwan4' feeds.conf.default; then
+      ok "  mwan4 explicitly installed"
+    fi
+  fi
   ok "  feeds done."
 
   # Minimal config seed: target + subtarget + device. defconfig fills the rest.
