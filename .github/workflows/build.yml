@@ -42,8 +42,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ github.sha }}
-          restore-keys: ccache-${{ runner.os }}-
+          key: ccache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: ''
 
       - name: Run build pipeline (deps + apply + compile)
         id: build
@@ -66,6 +66,44 @@ jobs:
           cp -v openwrt/bin/targets/mediatek/filogic/*mt3600be* artifacts/ 2>/dev/null || true
           cp -v logs/*.log artifacts/ 2>/dev/null || true
           ls -la artifacts/
+
+      - name: Verify MLO support in built firmware
+        if: success()
+        run: |
+          echo "=== Checking mt76 MLO support ==="
+          BUILD_DIR="openwrt/build_dir/target-aarch64_cortex-a53_musl"
+          MT76KO=$(find "$BUILD_DIR" -name "mt7996e.ko" -path "*/linux-*" 2>/dev/null | head -1)
+          if [[ -z "$MT76KO" ]]; then
+            echo "ERROR: mt7996e.ko not found in build dir"
+            exit 1
+          fi
+          echo "Found: $MT76KO"
+          MT76_VER=$(modinfo "$MT76KO" 2>/dev/null | grep "vermagic" || echo "unknown")
+          echo "Module vermagic: $MT76_VER"
+          # Check build log for mt76 version
+          if grep -q "mt76-2026.03.19~39c960c3" logs/*.log 2>/dev/null; then
+            echo "✓ mt76 source version 39c960c3 confirmed in build log"
+          else
+            echo "WARNING: mt76 39c960c3 NOT found in build log — MLO may be missing"
+          fi
+          # Check module was compiled fresh (not from stale cache)
+          MOD_DATE=$(stat -c '%Y' "$MT76KO" 2>/dev/null || stat -f '%m' "$MT76KO")
+          BUILD_TIME=$(date +%s)
+          AGE=$(( (BUILD_TIME - MOD_DATE) / 60 ))
+          echo "Module age: ~${AGE} minutes (should be < build duration)"
+          if [[ $AGE -gt 240 ]]; then
+            echo "WARNING: Module is $AGE min old — possible ccache/stale build!"
+            echo "  This means the mt76 driver was NOT recompiled in this build."
+            echo "  MLO support CANNOT be guaranteed."
+          else
+            echo "✓ Module compiled recently — fresh build confirmed"
+          fi
+          # List all mt76 kernel modules for audit
+          echo ""
+          echo "=== All mt76 kernel modules ==="
+          find "$BUILD_DIR" -name "mt7*.ko" -path "*/linux-*" 2>/dev/null | while read ko; do
+            echo "  $(basename $ko) — $(stat -c '%y' $ko 2>/dev/null || stat -f '%Sm' $ko)"
+          done
 
       - name: Upload firmware
         if: success()
