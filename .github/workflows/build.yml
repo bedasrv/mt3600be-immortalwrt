@@ -49,6 +49,8 @@ jobs:
         id: build
         run: |
           chmod +x ./build.sh
+          rm -rf openwrt/ logs/
+          ccache -C 2>/dev/null || true
           ./build.sh
 
       - name: Setup tmate session (on failure, manual only)
